@@ -158,7 +158,11 @@ class RssCollector:
                     metadata=self._prepare_metadata(entry)
                 )
                 
-                # Apstrādājam tagus
+                # Svarīgi - vispirms pievienojam ierakstu sesijai un saglabājam
+                self.db.add(new_entry)
+                self.db.flush()  # Ģenerējam ID un saglabājam ierakstu datubāzē
+
+                # Tikai pēc tam apstrādājam tagus
                 if 'tags' in entry and entry.tags:
                     for tag_item in entry.tags:
                         tag_name = tag_item.get('term', '')
@@ -168,13 +172,14 @@ class RssCollector:
                             if not tag:
                                 tag = Tag(name=tag_name)
                                 self.db.add(tag)
-                                self.db.flush()  # Iegūstam ID, nepabeidzot transakciju
+                                self.db.flush()  # Iegūstam tag ID
                             
                             # Pārbaudām, vai šis tags jau ir pievienots ierakstam
                             if tag not in new_entry.tags:
                                 new_entry.tags.append(tag)
-                
-                self.db.add(new_entry)
+
+                # Papildu flush, lai saglabātu attiecības
+                self.db.flush()
                 new_entries_count += 1
             
             # Atjaunojam barotnes statusu
