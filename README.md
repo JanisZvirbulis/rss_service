@@ -30,14 +30,12 @@
 ### Vides sagatavošana
 
 1. Klonējiet repozitoriju
-
 ```bash
 git clone https://github.com/yourusername/rss-service.git
 cd rss-service
 ```
 
 2. Izveidojiet virtuālo vidi un instalējiet atkarības
-
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux/macOS
@@ -47,7 +45,6 @@ pip install -r requirements.txt
 ```
 
 3. Izveidojiet `.env` failu ar sekojošiem iestatījumiem
-
 ```
 # Datubāzes konfigurācija
 POSTGRES_USER=postgres
@@ -65,7 +62,6 @@ DEBUG=True
 ```
 
 4. Inicializējiet datubāzi, izmantojot Alembic
-
 ```bash
 alembic revision --autogenerate -m "Initial migration"
 alembic upgrade head
@@ -74,28 +70,23 @@ alembic upgrade head
 ## Servisa palaišana
 
 1. Startējiet FastAPI servisu
-
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 2. Palaistiet Celery darbinieku
-
 ```bash
 celery -A celeryworker worker --loglevel=info
 celery -A celeryworker worker --pool=solo -Q feeds,maintenance --loglevel=info
-celery -A celeryworker worker --loglevel=info -Q feeds,maintenance,content --loglevel=info
 
 ```
 
 3. Palaistiet Celery Beat plānotāju (periodiskie uzdevumi)
-
 ```bash
 celery -A celeryworker beat --loglevel=info
 ```
 
 4. (Pēc izvēles) Palaistiet Flower monitoringu
-
 ```bash
 celery -A celeryworker flower
 ```
@@ -103,7 +94,6 @@ celery -A celeryworker flower
 ## API dokumentācija
 
 Kad serviss ir palaists, API dokumentācija ir pieejama:
-
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 
