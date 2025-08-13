@@ -78,6 +78,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```bash
 celery -A celeryworker worker --loglevel=info
 celery -A celeryworker worker --pool=solo -Q feeds,maintenance --loglevel=info
+celery -A celeryworker worker --pool=solo -Q feeds,maintenance,content --loglevel=info
 
 ```
 

@@ -1,6 +1,7 @@
 import feedparser
 import requests
 import datetime
+from celery import current_app
 import logging
 from typing import Dict, Any
 from sqlalchemy.orm import Session
@@ -178,6 +179,11 @@ class RssCollector:
                             if tag not in new_entry.tags:
                                 new_entry.tags.append(tag)
 
+                try:
+                    current_app.send_task('fetch_full_article_content', args=[new_entry.id])
+                    logger.info(f"Izsaukts pilnā raksta iegūšanas uzdevums: {new_entry.id}")
+                except Exception as e:
+                    logger.error(f"Neizdevās izsaukt pilnā raksta iegūšanu: {str(e)}")
                 # Papildu flush, lai saglabātu attiecības
                 self.db.flush()
                 new_entries_count += 1

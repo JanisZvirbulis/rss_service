@@ -10,6 +10,7 @@ task_routes = {
     'collect_all_rss_feeds': {'queue': 'feeds'},
     'collect_single_rss_feed': {'queue': 'feeds'},
     'cleanup_old_entries': {'queue': 'maintenance'},
+    'fetch_full_article_content': {'queue': 'content'},
 }
 
 # Darbu izsaukšanas grafiks

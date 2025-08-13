@@ -1,8 +1,12 @@
 from celery import shared_task
 import logging
+import requests
+from bs4 import BeautifulSoup
+from readability import Document
+from datetime import datetime
 from app.models.database import SessionLocal
 from app.services.rss_collector import RssCollector
-from app.models.models import RssFeed
+from app.models.models import RssFeed, Entry
 
 # Konfigurējam žurnalēšanu
 logging.basicConfig(level=logging.INFO)
@@ -121,3 +125,78 @@ def cleanup_old_entries(days: int = 30):
         raise
     finally:
         db.close()
+
+def get_clean_article_text(url: str) -> str:
+    """
+    Funkcija, kas iegūst tīru raksta tekstu no news URL
+    """
+    try:
+        # iegustam HTML
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()  # Pārbaudām, vai pieprasījums bija veiksmīgs   
+
+        #readability, lai iegutu raksta galveno tekstu
+        doc = Document(response.text)
+        article_html = doc.summary()
+
+        #BeautifulSoup, lai iegutu tīru tekstu
+        soup = BeautifulSoup(article_html, 'html.parser')
+        
+        # nonemam nevelabos elementus
+        for unwwanted in soup.find_all(['script', 'style', 'iframe', 'noscript', 'aside']):
+            unwwanted.decompose()
+
+        # nonemam ari klases vai id
+        for unwated in soup.find_all(
+            class_=lambda x: x and ('ads' in x or 'piano' in x or 'sidebar' in x)
+        ):
+            unwated.decompose()
+
+        # iegustam tiru tekstu
+        clean_text = soup.get_text(separator='\n\n')
+
+        clean_text = '\n'.join([line.strip() for line in clean_text.split('\n') if line.strip()])
+        
+        return clean_text
+    except Exception as e:
+        logger.error(f"Kļūda iegūstot tīru raksta tekstu no URL {url}: {str(e)}")
+        return f"kļūda iegūstot tīru raksta tekstu no URL {url}: {str(e)}"
+
+@shared_task(name="fetch_full_article_content")  
+def fetch_full_article_content(entry_id: str) -> str:
+    """
+    Celery uzdevums, kas iegūst pilnu raksta saturu no ievadītā ID
+    """
+    db = SessionLocal()
+    try:
+        logger.info(f"Sākas pilna raksta satura iegūšana no ievadītā ID {entry_id}")
+        # Iegūstam ierakstu no datubāzes   
+        entry = db.query(Entry).filter(Entry.id == entry_id).first()
+        if not entry:
+            logger.error(f"Ieraksts ar ID {entry_id} nav atrasts")
+            return {"error": "Entry not found"}
+        
+        # Iegūstam tīru raksta tekstu no URL
+        clean_text = get_clean_article_text(entry.link)
+
+        if clean_text and not clean_text.startswith("kļūda"):
+            # Atjaunojam ieraksta saturu datubāzē
+            entry.content = clean_text
+            entry.updated_at = datetime.utcnow()
+            db.commit()
+            logger.info(f"Veiksmīgi iegūts pilns raksta saturs no {entry.link}")
+            return {"success": True, }
+        else:
+            logger.error(f"Kļūda iegūstot pilnu raksta saturu no {entry.link}")
+            return {"success": False, }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Kļūda iegūstot pilnu raksta saturu no ievadītā ID {entry_id}: {str(e)}")
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+    
